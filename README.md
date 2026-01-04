@@ -7,6 +7,8 @@ I built this site as a practical companion for real CLI work: if I need to handl
 I can use this command builder to quickly produce correct commands and reduce mistakes under time
 pressure.
 
+Live demo : https://elhanauzan.my.id/acl/command-builder/
+
 ---
 
 ## Why This Exists (Learning + IT Support)
