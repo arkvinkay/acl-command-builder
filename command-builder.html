@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang=id>
+<meta charset=utf-8>
+<meta name=viewport content="width=device-width,initial-scale=1">
+<title>Permission Command Builder — Elhan</title>
+<link rel=icon href=https://elhanauzan.my.id/logo_transparent_r2.png type=image/png>
+<meta name=description content="Generator perintah Windows (icacls/takeown/attrib) dan Linux (chmod/chown/setfacl) berdasarkan opsi yang dipilih.">
+<link rel=stylesheet href="./style.css">
+<link rel=prefetch href=https://elhanauzan.my.id>
+<link rel=prefetch href=./manual/manual.html>
+<div class=wrap>
+    <header class=topbar aria-label=Navbar>
+        <div class=topbar-inner>
+            <div class=brand>
+                <div class=brand-badge aria-hidden=true>EN</div>
+                <div class=brand-title><strong>Permission Command Builder</strong>
+                    <span>Windows (icacls) · Linux (chmod/chown/setfacl)</span>
+                </div>
+            </div>
+            <nav class=nav aria-label="Navigasi halaman"><a href=https://elhanauzan.my.id>Home</a>
+                <a href=./manual/manual.html>Documentation</a>
+                <a href=https://elhanauzan.my.id/me/project>My Other Project</a>
+            </nav>
+        </div>
+    </header>
+    <div class=grid>
+        <section class=card id=pengaturan aria-label=Pengaturan>
+            <div class=hd>
+                <h2>Pengaturan</h2>
+                <div class=seg aria-label="Pemilihan sistem operasi"><label class=radio><input type=radio name=os value=windows checked>
+                        Windows
+                    </label><label class=radio><input type=radio name=os value=linux>
+                        Linux</label></div>
+            </div>
+            <div class=bd>
+                <p class=intro>Generator ini membangun perintah berdasarkan opsi yang dipilih. Untuk skenario sensitif, uji terlebih dahulu di folder uji sebelum diterapkan ke path produksi.
+                <div class=row>
+                    <div class=field><label for=path>Path file/folder</label>
+                        <input id=path placeholder='Windows: C:\Folder\File.txt | Linux: /home/user/file'>
+                        <div class=help>Path akan di-quote otomatis jika mengandung spasi.</div>
+                    </div>
+                    <div class=field><label for=targetType>Tipe target</label>
+                        <select id=targetType>
+                            <option value=auto selected>Otomatis
+                            <option value=file>File
+                            <option value=dir>Folder/Directory
+                        </select>
+                        <div class=help>Membantu preset Linux “Otomatis” (folder=755, file=644).</div>
+                    </div>
+                </div>
+                <div class=row>
+                    <div class=field><label for=mode>Mode</label>
+                        <select id=mode>
+                            <option value=basic selected>Dasar
+                            <option value=advanced>Lanjutan
+                            <option value=expert>Expert (tambahkan argumen manual)
+                        </select>
+                    </div>
+                    <div class=field><label>Rekursif</label>
+                        <div class=tog><input id=recursive type=checkbox>
+                            <div>
+                                <div><strong>Terapkan ke seluruh isi folder</strong></div>
+                                <div class=help>Windows: <span class=mono>/t</span> · Linux: <span class=mono>-R</span> atau <span class=mono>find -type f/d</span> sesuai opsi.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class=divider></div>
+                <div id=winPanel>
+                    <div class=row>
+                        <div class=field><label for=winAction>Aksi (Windows)</label>
+                            <select id=winAction>
+                                <option value=show selected>Tampilkan ACL (icacls)
+                                <option value=grant>Berikan izin (tambahkan) — /grant
+                                <option value=grant_r>Berikan izin (ganti) — /grant:r
+                                <option value=deny>Tolak izin — /deny
+                                <option value=remove>Hapus entri principal — /remove
+                                <option value=reset>Reset ACL — /reset
+                                <option value=inheritance>Atur inheritance — /inheritance
+                                <option value=setowner>Ubah owner — /setowner
+                                <option value=save>Cadangkan ACL — /save
+                                <option value=restore>Pulihkan ACL — /restore
+                                <option value=attrib_ro>Atribut read-only (attrib +/-R)
+                                <option value=takeown>Ambil kepemilikan (takeown)
+                            </select>
+                        </div>
+                        <div class=field id=winPrincipalField><label for=winPrincipal>Principal (user/group)</label>
+                            <input id=winPrincipal placeholder="Contoh: DOMAIN\\User atau User">
+                            <div class=help>Diperlukan untuk Grant/Deny/Remove/SetOwner.</div>
+                        </div>
+                    </div>
+                    <div class=row id=winScopeRow>
+                        <div class=field><label for=winApplyScope>Ruang lingkup penerapan</label>
+                            <select id=winApplyScope>
+                                <option value=this selected>Hanya objek ini
+                                <option value=this_children>Objek ini + turunan (child)
+                                <option value=children>Hanya turunan (inherit-only)
+                            </select>
+                        </div>
+                        <div class=field><label for=winApplyTo>Berlaku untuk</label>
+                            <select id=winApplyTo>
+                                <option value=both selected>File + Folder (OI+CI)
+                                <option value=files>Hanya file (OI)
+                                <option value=folders>Hanya folder (CI)
+                            </select>
+                        </div>
+                    </div>
+                    <div class=row id=winInheritFlagsRow>
+                        <div class=field><label>Flag inheritance (ACE)</label>
+                            <div class=checks><label class=chk><input type=checkbox id=wOI checked> (OI)</label>
+                                <label class=chk><input type=checkbox id=wCI checked> (CI)</label>
+                                <label class=chk><input type=checkbox id=wIO> (IO)</label>
+                                <label class=chk><input type=checkbox id=wNP> (NP)</label>
+                            </div>
+                            <div class=help>Untuk “hanya turunan”, umumnya gunakan <span class=mono>(IO)</span>.</div>
+                        </div>
+                        <div class=field id=winInheritanceModeRow><label for=winInheritanceMode>Mode inheritance</label>
+                            <select id=winInheritanceMode>
+                                <option value=e selected>Aktifkan
+                                <option value=d>Nonaktifkan (inherit jadi eksplisit)
+                                <option value=r>Hapus entri inherited
+                            </select>
+                            <div class=help>Digunakan saat aksi = Atur inheritance.</div>
+                        </div>
+                    </div>
+                    <div id=winPermSection>
+                        <div class=field><label>Izin (Windows)</label>
+                            <details class=opt open>
+                                <summary>Hak akses standar</summary>
+                                <div class=checks style=margin-top:10px><label class=chk><input type=checkbox id=wF> F (Full control)</label>
+                                    <label class=chk><input type=checkbox id=wM> M (Modify)</label>
+                                    <label class=chk><input type=checkbox id=wRX> RX (Read/Execute)</label>
+                                    <label class=chk><input type=checkbox id=wR> R (Read)</label>
+                                    <label class=chk><input type=checkbox id=wW> W (Write)</label>
+                                    <label class=chk><input type=checkbox id=wD> D (Delete)</label>
+                                </div>
+                                <div class=help>Jika memilih hak akses lanjutan, output akan memakai format daftar (mis. <span class=mono>(WDAC,WO,DC)</span>).</div>
+                            </details>
+                            <details class=opt id=winAdvRights>
+                                <summary>Hak akses lanjutan (granular)</summary>
+                                <div class="checks small" style=margin-top:10px><label class=chk><input type=checkbox data-wadv=RC> RC (Read control)</label>
+                                    <label class=chk><input type=checkbox data-wadv=WDAC> WDAC (Write DAC)</label>
+                                    <label class=chk><input type=checkbox data-wadv=WO> WO (Write owner)</label>
+                                    <label class=chk><input type=checkbox data-wadv=S> S (Synchronize)</label>
+                                    <label class=chk><input type=checkbox data-wadv=RD> RD (Read data / list)</label>
+                                    <label class=chk><input type=checkbox data-wadv=WD> WD (Write data / add)</label>
+                                    <label class=chk><input type=checkbox data-wadv=AD> AD (Append / add subdir)</label>
+                                    <label class=chk><input type=checkbox data-wadv=REA> REA (Read EA)</label>
+                                    <label class=chk><input type=checkbox data-wadv=WEA> WEA (Write EA)</label>
+                                    <label class=chk><input type=checkbox data-wadv=X> X (Execute / traverse)</label>
+                                    <label class=chk><input type=checkbox data-wadv=DC> DC (Delete child)</label>
+                                    <label class=chk><input type=checkbox data-wadv=RA> RA (Read attributes)</label>
+                                    <label class=chk><input type=checkbox data-wadv=WA> WA (Write attributes)</label>
+                                    <label class=chk><input type=checkbox data-wadv=DE> DE (Delete)</label>
+                                    <label class=chk><input type=checkbox data-wadv=GR> GR (Generic read)</label>
+                                    <label class=chk><input type=checkbox data-wadv=GW> GW (Generic write)</label>
+                                    <label class=chk><input type=checkbox data-wadv=GE> GE (Generic execute)</label>
+                                    <label class=chk><input type=checkbox data-wadv=GA> GA (Generic all)</label>
+                                </div>
+                                <div class=help>Gunakan ini jika membutuhkan kontrol lebih spesifik dibanding hak akses standar.</div>
+                            </details>
+                            <div class=note id=catatan><strong>Catatan:</strong> Flag inheritance <span class=mono>(OI)(CI)</span> mengatur pewarisan ke objek turunan, sedangkan <span class=mono>/t</span> menerapkan perubahan ke objek yang sudah ada di bawahnya.</div>
+                        </div>
+                    </div>
+                    <div class="row hidden" id=winSaveRestoreRow>
+                        <div class=field><label for=winAclFile>File cadangan ACL</label>
+                            <input id=winAclFile placeholder="Contoh: C:\\temp\\acl-backup.txt">
+                        </div>
+                        <div class=field><label for=winRoot>Root folder (untuk save/restore)</label>
+                            <input id=winRoot placeholder="Contoh: C:\\TargetFolder">
+                        </div>
+                    </div>
+                    <div class="row hidden" id=winAttribRow>
+                        <div class=field><label for=winAttribMode>Mode atribut</label>
+                            <select id=winAttribMode>
+                                <option value=+R selected>Set read-only (+R)
+                                <option value=-R>Hapus read-only (-R)
+                            </select>
+                        </div>
+                        <div class=field><label for=winAttribTarget>Penerapan attrib</label>
+                            <select id=winAttribTarget>
+                                <option value=path selected>Hanya path
+                                <option value=recursive>Rekursif (folder + file)
+                            </select>
+                            <div class=help>Mode rekursif menggunakan <span class=mono>/s /d</span>.</div>
+                        </div>
+                    </div>
+                    <details class=opt id=winAdvancedBlock>
+                        <summary>Workflow (Windows) — opsi lanjutan</summary>
+                        <div class=row style=margin-top:10px>
+                            <div class=field><label>Pra-tindakan</label>
+                                <div class=tog><input id=wPreTakeown type=checkbox>
+                                    <div>
+                                        <div><strong>Tambahkan takeown sebelum aksi utama</strong></div>
+                                        <div class=help>Membantu saat akses/owner bermasalah.</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class=field><label>&nbsp;</label>
+                                <div class=tog><input id=wTakeownAdmin type=checkbox>
+                                    <div>
+                                        <div><strong>takeown /a</strong></div>
+                                        <div class=help>Owner menjadi grup Administrators.</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class=row style=margin-top:10px>
+                            <div class=field><label>&nbsp;</label>
+                                <div class=tog><input id=wPreReset type=checkbox>
+                                    <div>
+                                        <div><strong>Tambahkan icacls /reset sebelum aksi utama</strong></div>
+                                        <div class=help>Reset ACL terlebih dahulu (opsional).</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class=field><label>&nbsp;</label>
+                                <div class=tog><input id=wContOnErr type=checkbox>
+                                    <div>
+                                        <div><strong>icacls /c</strong></div>
+                                        <div class=help>Lanjutkan proses meski ada error pada beberapa item.</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class=row style=margin-top:10px>
+                            <div class=field><label for=winCmdJoin>Format output</label>
+                                <select id=winCmdJoin>
+                                    <option value=multiline selected>Multi-baris
+                                    <option value=oneliner>Satu baris (&&)
+                                </select>
+                            </div>
+                            <div class=field><label for=winRawFlags>Tambahkan flag manual (Mode Expert)</label>
+                                <input id=winRawFlags placeholder="Contoh: /q  atau  /t /c">
+                                <div class=help>Aktif jika Mode = Expert.</div>
+                            </div>
+                        </div>
+                    </details>
+                </div>
+                <div id=linuxPanel class=hidden>
+                    <div class=row>
+                        <div class=field><label for=linAction>Aksi (Linux)</label>
+                            <select id=linAction>
+                                <option value=chmod selected>chmod (atur permission)
+                                <option value=chown>chown (atur owner/group)
+                                <option value=chgrp>chgrp (atur group)
+                                <option value=setfacl_m>setfacl -m (tambah/ubah ACL)
+                                <option value=setfacl_x>setfacl -x (hapus entri ACL)
+                                <option value=setfacl_b>setfacl -b (hapus semua ACL)
+                                <option value=setfacl_k>setfacl -k (hapus default ACL pada folder)
+                                <option value=getfacl>getfacl (tampilkan ACL)
+                                <option value=acl_backup>Cadangkan ACL (getfacl -R > file)
+                                <option value=acl_restore>Pulihkan ACL (setfacl --restore)
+                            </select>
+                        </div>
+                        <div class=field><label>sudo</label>
+                            <div class=tog><input id=linSudo type=checkbox checked>
+                                <div>
+                                    <div><strong>Tambahkan prefix sudo</strong></div>
+                                    <div class=help>Nonaktifkan jika tidak diperlukan.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class=row id=linChmodModeRow>
+                        <div class=field><label for=linChmodMode>Mode chmod (khusus Linux)</label>
+                            <select id=linChmodMode>
+                                <option value=numeric selected>Angka (mis. 755)
+                                <option value=symbolic>Huruf (mis. u=rwX,g=rX,o=)
+                            </select>
+                        </div>
+                        <div class=field><label for=linApplyTo>Terapkan untuk</label>
+                            <select id=linApplyTo>
+                                <option value=both selected>File + Folder
+                                <option value=files>Hanya file (find -type f)
+                                <option value=dirs>Hanya folder (find -type d)
+                            </select>
+                            <div class=help>Direkomendasikan jika kamu ingin folder 755 dan file 644 secara terpisah.</div>
+                        </div>
+                    </div>
+                    <div id=linPermSection>
+                        <div class=field><label>Permission (Linux: pemilik / grup / lainnya)</label>
+                            <div class=perm-grid>
+                                <div class=perm-box>
+                                    <h4>Pemilik (u)</h4>
+                                    <div class=checks><label class=chk><input type=checkbox id=luR> r</label>
+                                        <label class=chk><input type=checkbox id=luW> w</label>
+                                        <label class=chk><input type=checkbox id=luX> x</label>
+                                    </div>
+                                </div>
+                                <div class=perm-box>
+                                    <h4>Grup (g)</h4>
+                                    <div class=checks><label class=chk><input type=checkbox id=lgR> r</label>
+                                        <label class=chk><input type=checkbox id=lgW> w</label>
+                                        <label class=chk><input type=checkbox id=lgX> x</label>
+                                    </div>
+                                </div>
+                                <div class=perm-box>
+                                    <h4>Lainnya (o)</h4>
+                                    <div class=checks><label class=chk><input type=checkbox id=loR> r</label>
+                                        <label class=chk><input type=checkbox id=loW> w</label>
+                                        <label class=chk><input type=checkbox id=loX> x</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class=row style=margin-top:10px>
+                                <div class=field><label>Opsi tambahan</label>
+                                    <div class=tog><input id=linUseX type=checkbox>
+                                        <div>
+                                            <div><strong>Gunakan X (kapital) saat rekursif</strong></div>
+                                            <div class=help><span class=mono>X</span> hanya memberi execute untuk folder atau file yang sudah executable sebelumnya.</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class=field><label for=linPreset>Preset cepat</label>
+                                    <select id=linPreset>
+                                        <option value=none selected>—
+                                        <option value=auto>Otomatis (folder=755, file=644)
+                                        <option value=755>755
+                                        <option value=750>750
+                                        <option value=644>644
+                                        <option value=640>640
+                                        <option value=700>700
+                                        <option value=600>600
+                                    </select>
+                                    <div class=help>Preset hanya membantu mengisi checkbox dengan cepat.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row hidden" id=linOwnerRow>
+                        <div class=field><label for=linOwner>Owner (user)</label>
+                            <input id=linOwner placeholder="Contoh: root atau elhan">
+                        </div>
+                        <div class=field><label for=linGroup>Group</label>
+                            <input id=linGroup placeholder="Contoh: root atau staff">
+                        </div>
+                    </div>
+                    <div class="row hidden" id=linAclRow>
+                        <div class=field><label for=linAclType>Tipe ACL</label>
+                            <select id=linAclType>
+                                <option value=u selected>User (u:NAME:perm)
+                                <option value=g>Group (g:NAME:perm)
+                                <option value=m>Mask (m::perm)
+                                <option value=o>Other (o::perm)
+                            </select>
+                        </div>
+                        <div class=field><label for=linAclName>Nama (khusus u/g)</label>
+                            <input id=linAclName placeholder="Contoh: elhan / staff (kosong untuk m/o)">
+                        </div>
+                    </div>
+                    <div class="row hidden" id=linAclPermRow>
+                        <div class=field><label for=linAclPerm>Permission ACL</label>
+                            <input id=linAclPerm placeholder="Contoh: rwX / r-x / rw-">
+                        </div>
+                        <div class=field><label>Default ACL (folder)</label>
+                            <div class=tog><input id=linDefaultAcl type=checkbox>
+                                <div>
+                                    <div><strong>Gunakan prefix d:</strong></div>
+                                    <div class=help>Default ACL diwariskan ke item baru di bawah folder.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row hidden" id=linAclFileRow>
+                        <div class=field><label for=linAclFile>Path file ACL (backup/restore)</label>
+                            <input id=linAclFile placeholder="Contoh: ./acl-backup.txt">
+                        </div>
+                        <div class=field><label for=linCmdJoin>Format output</label>
+                            <select id=linCmdJoin>
+                                <option value=multiline selected>Multi-baris
+                                <option value=oneliner>Satu baris (&&)
+                            </select>
+                        </div>
+                    </div>
+                    <details class=opt id=linAdvancedBlock>
+                        <summary>Opsi lanjutan (Linux)</summary>
+                        <div class=row style=margin-top:10px>
+                            <div class=field><label for=linCmdJoin2>Format output</label>
+                                <select id=linCmdJoin2>
+                                    <option value=multiline selected>Multi-baris
+                                    <option value=oneliner>Satu baris (&&)
+                                </select>
+                            </div>
+                            <div class=field><label for=linRawArgs>Tambahkan argumen manual (Mode Expert)</label>
+                                <input id=linRawArgs placeholder="Contoh: -P  atau  -H  atau opsi lain">
+                                <div class=help>Aktif jika Mode = Expert.</div>
+                            </div>
+                        </div>
+                    </details>
+                </div><noscript>
+                    <div class=note style=border-color:#fecaca;color:#7f1d1d;background:#fff><strong>JavaScript tidak aktif / terblokir.</strong> Output tidak dapat dibuat tanpa JavaScript.</div>
+                </noscript>
+            </div>
+        </section>
+        <section class=card id=output aria-label=Output>
+            <div class=hd>
+                <h2>Output</h2>
+                <div class=actions><span class=chip id=osChip>Windows</span>
+                    <button class=btn id=btnCopy type=button disabled>Salin</button>
+                </div>
+            </div>
+            <div class=bd>
+                <div class=status id=statusLine><span class=warn>Menunggu input.</span>
+                    <span>Isi pengaturan untuk menghasilkan perintah.</span>
+                </div>
+                <div style=height:10px></div><textarea id=out readonly placeholder="Perintah akan muncul di sini..."></textarea>
+                <div class=note><strong>Catatan:</strong> Di Linux, “penolakan akses” umumnya dilakukan dengan mengurangi permission (chmod) atau menghapus entri ACL (setfacl -x), bukan konsep “deny ACE” seperti Windows.</div>
+            </div>
+        </section>
+    </div>
+</div>
+<script src="./script.js" defer></script>
