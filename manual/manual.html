@@ -1,0 +1,730 @@
+<!doctype html>
+<html lang=id>
+<meta charset=utf-8>
+<meta name=viewport content="width=device-width,initial-scale=1">
+<title>Dokumentasi — Permission Command Builder</title>
+<meta name=description content="Panduan pengguna dan materi pembelajaran untuk Permission Command Builder (Windows icacls/takeown/attrib dan Linux chmod/chown/setfacl).">
+<link rel=stylesheet href=./style.css>
+<link rel=icon href=https://elhanauzan.my.id/logo_transparent_r2.png type=image/png>
+<div class=wrap>
+    <div class=utilitybar aria-label="Tautan cepat"><a href=https://elhanauzan.my.id rel=noopener>Home</a>
+        <a href=../command-builder.html />Command Builder</a>
+        <a href=https://elhanauzan.my.id/me/project>My Other Project</a>
+    </div>
+    <header class=topbar aria-label=Navbar>
+        <div class=topbar-inner>
+            <div class=brand>
+                <div class=brand-badge aria-hidden=true>EN</div>
+                <div class=brand-title><strong>Dokumentasi Lengkap</strong>
+                    <span>Permission Command Builder</span>
+                </div>
+            </div>
+            <nav class=nav aria-label=Navigasi><a href=#ringkasan>Ringkasan</a>
+                <a href=#konsep>Konsep</a>
+                <a href=#panduan-ui>Panduan UI</a>
+                <a href=#windows>Windows</a>
+                <a href=#linux>Linux</a>
+                <a href=#cookbook>Cookbook</a>
+                <a href=#troubleshooting>Troubleshooting</a>
+            </nav>
+        </div>
+    </header>
+    <div class=hero id=ringkasan>
+        <h1>Dokumentasi Permission Command Builder</h1>
+        <p class=muted>Halaman ini dirancang sebagai <strong>panduan pengguna</strong> sekaligus <strong>materi pembelajaran</strong> tentang permission/ACL
+            pada Windows dan Linux. Fokusnya adalah memahami konsep dasar, memetakan opsi UI ke perintah yang dihasilkan, serta menerapkan praktik aman.
+        <div class="callout warn"><strong>Peringatan penting</strong>
+            <ul>
+                <li>Perubahan permission/ACL dapat memutus akses aplikasi, user, atau sistem. Selalu uji di folder uji terlebih dahulu.
+                <li>Sebelum perubahan skala besar, lakukan <strong>backup ACL</strong> (Windows: <span class=inlinecode>/save</span>, Linux: <span class=inlinecode>getfacl -R</span>).
+                <li>Dokumentasi ini memakai istilah umum. Hasil akhir tetap dipengaruhi konteks (inheritance, policy, dan kondisi objek).
+            </ul>
+        </div>
+    </div>
+    <div class=grid>
+        <div>
+            <section class=card id=konsep>
+                <div class=hd>
+                    <h2>1) Konsep dasar yang wajib dipahami</h2><span class=chip>Pembelajaran</span>
+                </div>
+                <div class=bd>
+                    <h3>1.1 Permission vs ACL vs Atribut</h3>
+                    <ul>
+                        <li><strong>Permission (Linux classic)</strong>: mode bit <span class=inlinecode>r/w/x</span> untuk <span class=inlinecode>u/g/o</span>.
+                        <li><strong>ACL (Windows & Linux POSIX ACL)</strong>: daftar entri izin untuk principal tertentu (user/group) dengan aturan evaluasi tertentu.
+                        <li><strong>Atribut (Windows attrib read-only)</strong>: bukan keamanan ACL. Atribut dapat memengaruhi perilaku aplikasi, tetapi <em>tidak</em> setara dengan kontrol akses NTFS.
+                    </ul>
+                    <h3>1.2 Makna r/w/x pada file vs folder (Linux)</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Bit
+                                <th>File
+                                <th>Folder/Directory
+                        <tbody>
+                            <tr>
+                                <td><span class=mono>r</span>
+                                <td>Membaca isi file
+                                <td>Melihat daftar nama file (list)
+                            <tr>
+                                <td><span class=mono>w</span>
+                                <td>Menulis/mengubah isi file
+                                <td>Membuat/menghapus/rename entri di folder (umumnya perlu <span class=mono>x</span> juga)
+                            <tr>
+                                <td><span class=mono>x</span>
+                                <td>Menjalankan (execute) jika file executable
+                                <td>Masuk/traverse ke folder dan mengakses item di dalamnya
+                    </table>
+                    <p class=note>Contoh umum: folder yang bisa “dibaca daftar file”-nya tetapi tidak bisa masuk ke dalam folder sering disebabkan <span class=inlinecode>r</span> ada, namun <span class=inlinecode>x</span> tidak ada.
+                    <h3>1.3 Owner, group, dan “other” (Linux) serta ownership (Windows)</h3>
+                    <ul>
+                        <li>Linux memiliki konsep owner dan group; permission dasar selalu dihitung dari <span class=inlinecode>u/g/o</span> serta ACL bila ada.
+                        <li>Windows memiliki owner objek (NTFS owner). Owner berhak mengubah ACL (tergantung kebijakan), sehingga ownership penting saat “reclaim access”.
+                    </ul>
+                    <h3>1.4 Inheritance / pewarisan</h3>
+                    <ul>
+                        <li><strong>Windows</strong>: inheritance diatur oleh flag ACE (OI/CI/IO/NP) dan state inheritance objek (<span class=inlinecode>/inheritance:e|d|r</span>).
+                        <li><strong>Linux</strong>: permission dasar tidak “inherit” seperti Windows. Pewarisan biasanya terjadi lewat:<ul>
+                                <li><strong>Default ACL</strong> pada folder (POSIX ACL) — berlaku untuk item baru.
+                                <li><strong>setgid</strong> pada folder — mempengaruhi group untuk item baru (tergantung FS).
+                            </ul>
+                    </ul>
+                    <h3>1.5 Chmod numeric vs symbolic (Linux)</h3>
+                    <ul>
+                        <li><strong>Numeric</strong>: 3 digit (atau 4 digit jika special bits) — contoh <span class=inlinecode>755</span>.
+                        <li><strong>Symbolic</strong>: aturan eksplisit — contoh <span class=inlinecode>u=rwX,g=rX,o=</span>, <span class=inlinecode>g+w</span>.
+                    </ul>
+                    <details>
+                        <summary>Tambahan materi: special bits (setuid/setgid/sticky)</summary>
+                        <p>Special bits (digit ke-4 pada chmod numeric) sering digunakan pada sistem Linux.
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Bit
+                                    <th>Angka
+                                    <th>Makna umum
+                                    <th>Contoh
+                            <tbody>
+                                <tr>
+                                    <td>setuid
+                                    <td><span class=mono>4xxx</span>
+                                    <td>Program berjalan dengan privilege owner file
+                                    <td><span class=inlinecode>chmod 4755 /usr/bin/passwd</span>
+                                <tr>
+                                    <td>setgid
+                                    <td><span class=mono>2xxx</span>
+                                    <td>Pada folder: file baru cenderung mewarisi group folder
+                                    <td><span class=inlinecode>chmod 2775 /shared</span>
+                                <tr>
+                                    <td>sticky
+                                    <td><span class=mono>1xxx</span>
+                                    <td>Pada folder: hanya owner file (atau root) yang dapat menghapus file-nya
+                                    <td><span class=inlinecode>chmod 1777 /tmp</span>
+                        </table>
+                        <p class=note>Gunakan special bits dengan sangat hati-hati. Pada lingkungan produksi, ikuti kebijakan keamanan organisasi.
+                    </details>
+                </div>
+            </section>
+            <section class=card id=panduan-ui>
+                <div class=hd>
+                    <h2>2) Panduan UI: pemetaan opsi ke perilaku generator</h2><span class=chip>Panduan pengguna</span>
+                </div>
+                <div class=bd>
+                    <h3>2.1 OS</h3>
+                    <ul>
+                        <li><strong>Windows</strong> menghasilkan perintah berbasis <span class=inlinecode>icacls</span>, <span class=inlinecode>takeown</span>, dan <span class=inlinecode>attrib</span>.
+                        <li><strong>Linux</strong> menghasilkan perintah berbasis <span class=inlinecode>chmod</span>, <span class=inlinecode>chown/chgrp</span>, <span class=inlinecode>setfacl/getfacl</span>.
+                    </ul>
+                    <h3>2.2 Path file/folder</h3>
+                    <ul>
+                        <li>Generator akan menambahkan tanda kutip bila path mengandung spasi.
+                        <li>Di Windows, format umum: <span class=inlinecode>C:\Folder\File.txt</span>. Di Linux: <span class=inlinecode>/path/target</span>.
+                    </ul>
+                    <h3>2.3 Tipe target</h3>
+                    <ul>
+                        <li><strong>Otomatis</strong>: membantu preset Linux “folder 755, file 644” jika kamu memilih preset otomatis.
+                        <li><strong>File</strong> / <strong>Folder</strong>: memaksa interpretasi saat memakai preset otomatis.
+                    </ul>
+                    <h3>2.4 Mode</h3>
+                    <ul>
+                        <li><strong>Dasar</strong>: fokus pada opsi inti.
+                        <li><strong>Lanjutan</strong>: menampilkan blok opsi tambahan (workflow / ACL).
+                        <li><strong>Pakar</strong>: membuka input argumen manual yang akan ditempel ke perintah (gunakan hanya jika benar-benar paham).
+                    </ul>
+                    <h3>2.5 Rekursif</h3>
+                    <ul>
+                        <li><strong>Windows</strong>: menggunakan <span class=inlinecode>/t</span> pada icacls untuk menerapkan perubahan ke isi folder.
+                        <li><strong>Linux</strong>:<ul>
+                                <li>Untuk chmod/chown/chgrp, bisa memakai <span class=inlinecode>-R</span>.
+                                <li>Jika memilih “Hanya file” atau “Hanya folder”, generator membungkus dengan <span class=inlinecode>find -type f/d</span>.
+                            </ul>
+                    </ul>
+                    <h3>2.6 Format output</h3>
+                    <ul>
+                        <li><strong>Multi-baris</strong>: setiap command di baris terpisah (lebih mudah dibaca & audit).
+                        <li><strong>Satu baris (&&)</strong>: command dirangkai dengan operator <span class=inlinecode>&&</span> (lebih ringkas, tetapi lebih sulit dibaca).
+                    </ul>
+                    <h3>2.7 Tombol Salin</h3>
+                    <p class=muted>Menyalin output ke clipboard. Disarankan untuk menempelkan perintah ke catatan tiket/incident agar ada audit trail.
+                </div>
+            </section>
+            <section class=card id=windows>
+                <div class=hd>
+                    <h2>3) Windows: icacls / takeown / attrib (materi lengkap)</h2><span class=chip>Windows</span>
+                </div>
+                <div class=bd>
+                    <h3>3.1 Gambaran umum model akses Windows (NTFS ACL)</h3>
+                    <ul>
+                        <li>Windows memakai ACL (Access Control List) yang berisi ACE (Access Control Entry).
+                        <li>Setiap ACE mengikat <strong>principal</strong> (user/group) dengan <strong>hak akses</strong> dan (opsional) <strong>flag inheritance</strong>.
+                        <li>Hak akses efektif dipengaruhi oleh: ACE explicit vs inherited, deny vs allow, membership group, dan scope inheritance.
+                    </ul>
+                    <details open>
+                        <summary>3.2 Aksi Windows: kapan dipakai?</summary>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Aksi
+                                    <th>Tujuan
+                                    <th>Kapan digunakan
+                            <tbody>
+                                <tr>
+                                    <td><strong>Tampilkan ACL</strong> (<span class=mono>icacls</span>)
+                                    <td>Melihat izin saat ini
+                                    <td>Selalu lakukan sebelum mengubah, sebagai baseline
+                                <tr>
+                                    <td><strong>/grant</strong>
+                                    <td>Menambahkan ACE allow
+                                    <td>Jika ingin menambah akses tanpa mengubah ACE principal lain
+                                <tr>
+                                    <td><strong>/grant:r</strong>
+                                    <td>Mengganti ACE untuk principal target
+                                    <td>Jika ingin hasil deterministik untuk principal tertentu
+                                <tr>
+                                    <td><strong>/deny</strong>
+                                    <td>Menambahkan ACE deny
+                                    <td>Jika memang wajib menolak akses (hati-hati)
+                                <tr>
+                                    <td><strong>/remove</strong>
+                                    <td>Menghapus ACE principal
+                                    <td>Jika ingin membersihkan izin khusus
+                                <tr>
+                                    <td><strong>/reset</strong>
+                                    <td>Reset ACL ke default inheritance
+                                    <td>Jika ACL “berantakan” dan ingin kembali ke baseline folder parent
+                                <tr>
+                                    <td><strong>/inheritance:e|d|r</strong>
+                                    <td>Atur pewarisan dari parent
+                                    <td>Jika perlu memutus/menormalkan inheritance
+                                <tr>
+                                    <td><strong>/setowner</strong>
+                                    <td>Ubah owner
+                                    <td>Jika ownership salah dan menghalangi pengelolaan ACL
+                                <tr>
+                                    <td><strong>/save /restore</strong>
+                                    <td>Backup & restore ACL
+                                    <td>Sebelum operasi besar; atau rollback cepat
+                                <tr>
+                                    <td><strong>takeown</strong>
+                                    <td>Reclaim ownership
+                                    <td>Jika akses tertutup dan perlu “ambil alih” kepemilikan
+                                <tr>
+                                    <td><strong>attrib +/-R</strong>
+                                    <td>Atur atribut Read-only
+                                    <td>Untuk kebutuhan aplikasi/atribut, bukan kontrol keamanan ACL
+                        </table>
+                    </details>
+                    <h3>3.3 Principal (user/group)</h3>
+                    <ul>
+                        <li>Principal dapat berupa user lokal, domain user, atau group.
+                        <li>Format umum: <span class=inlinecode>DOMAIN\User</span>, <span class=inlinecode>User</span>, atau group seperti <span class=inlinecode>Users</span>.
+                        <li>Efektif permission dipengaruhi membership group. Jika user anggota beberapa group, izin bisa “bertambah”.
+                    </ul>
+                    <h3>3.4 Hak akses standar (icacls)</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Kode
+                                <th>Nama
+                                <th>Catatan
+                        <tbody>
+                            <tr>
+                                <td class=mono>F
+                                <td>Full control
+                                <td>Mencakup hampir semua hak, termasuk mengubah permission/owner (tergantung konteks)
+                            <tr>
+                                <td class=mono>M
+                                <td>Modify
+                                <td>Umumnya untuk edit konten + delete, tanpa set permission/owner
+                            <tr>
+                                <td class=mono>RX
+                                <td>Read & execute
+                                <td>Membaca dan menjalankan/men-traverse
+                            <tr>
+                                <td class=mono>R
+                                <td>Read
+                                <td>Read-only
+                            <tr>
+                                <td class=mono>W
+                                <td>Write
+                                <td>Tulis/ubah konten (dengan batasan tertentu)
+                            <tr>
+                                <td class=mono>D
+                                <td>Delete
+                                <td>Hak delete (sering dianggap “lanjutan” oleh banyak admin)
+                    </table>
+                    <details>
+                        <summary>3.5 Hak akses granular (granular rights) — arti dan kapan digunakan</summary>
+                        <p class=muted>Builder menyediakan opsi granular untuk skenario spesifik. Tidak semua hak relevan untuk semua tipe objek.
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Kode
+                                    <th>Arti ringkas
+                                    <th>Umum dipakai untuk
+                            <tbody>
+                                <tr>
+                                    <td class=mono>RC
+                                    <td>Read control
+                                    <td>Membaca ACL/owner (bagian kontrol)
+                                <tr>
+                                    <td class=mono>WDAC
+                                    <td>Write DAC
+                                    <td>Mengubah permission (ACL). Sangat sensitif.
+                                <tr>
+                                    <td class=mono>WO
+                                    <td>Write owner
+                                    <td>Mengubah owner. Sangat sensitif.
+                                <tr>
+                                    <td class=mono>S
+                                    <td>Synchronize
+                                    <td>Sinkronisasi handle; biasanya ikut dalam banyak set hak
+                                <tr>
+                                    <td class=mono>RD
+                                    <td>Read data / List directory
+                                    <td>File: baca data; Folder: list directory
+                                <tr>
+                                    <td class=mono>WD
+                                    <td>Write data / Add file
+                                    <td>File: tulis data; Folder: tambah file
+                                <tr>
+                                    <td class=mono>AD
+                                    <td>Append data / Add subdirectory
+                                    <td>File: append; Folder: tambah subfolder
+                                <tr>
+                                    <td class=mono>REA
+                                    <td>Read extended attributes
+                                    <td>Baca EA
+                                <tr>
+                                    <td class=mono>WEA
+                                    <td>Write extended attributes
+                                    <td>Tulis EA
+                                <tr>
+                                    <td class=mono>X
+                                    <td>Execute / Traverse
+                                    <td>File: execute; Folder: traverse
+                                <tr>
+                                    <td class=mono>DC
+                                    <td>Delete child
+                                    <td>Folder: menghapus child item (tergantung konteks)
+                                <tr>
+                                    <td class=mono>RA
+                                    <td>Read attributes
+                                    <td>Membaca atribut
+                                <tr>
+                                    <td class=mono>WA
+                                    <td>Write attributes
+                                    <td>Mengubah atribut
+                                <tr>
+                                    <td class=mono>DE
+                                    <td>Delete
+                                    <td>Hak delete eksplisit
+                                <tr>
+                                    <td class=mono>GR
+                                    <td>Generic read
+                                    <td>Set generik (OS map ke hak-hak dasar)
+                                <tr>
+                                    <td class=mono>GW
+                                    <td>Generic write
+                                    <td>Set generik
+                                <tr>
+                                    <td class=mono>GE
+                                    <td>Generic execute
+                                    <td>Set generik
+                                <tr>
+                                    <td class=mono>GA
+                                    <td>Generic all
+                                    <td>Set generik “all”
+                        </table>
+                        <div class="callout warn"><strong>Pedoman praktis</strong>
+                            <ul>
+                                <li>Jika tujuanmu “user bisa mengubah izin”, itu biasanya melibatkan <span class=inlinecode>WDAC</span> (berisiko tinggi).
+                                <li>Jika tujuanmu “user bisa menghapus file/folder”, pastikan hak delete sesuai kebutuhan (mis. <span class=inlinecode>D</span>/<span class=inlinecode>DE</span>), dan pahami dampaknya pada child.
+                            </ul>
+                        </div>
+                    </details>
+                    <h3>3.6 Inheritance: OI / CI / IO / NP</h3>
+                    <p>Flag inheritance adalah bagian dari ACE (bukan switch global). Berikut interpretasi yang paling berguna untuk praktik.
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Flag
+                                <th>Makna
+                                <th>Contoh penggunaan
+                        <tbody>
+                            <tr>
+                                <td class=mono>(OI)
+                                <td>Object inherit — diwariskan ke file
+                                <td>Memberi izin ke file-file di bawah folder
+                            <tr>
+                                <td class=mono>(CI)
+                                <td>Container inherit — diwariskan ke folder
+                                <td>Memberi izin ke subfolder
+                            <tr>
+                                <td class=mono>(IO)
+                                <td>Inherit only — tidak berlaku pada objek ini, hanya pada turunan
+                                <td>“Hanya turunan” (inherit-only policy)
+                            <tr>
+                                <td class=mono>(NP)
+                                <td>No propagate — berhenti di satu level turunan
+                                <td>Memberi izin hanya ke anak langsung, bukan cucu
+                    </table>
+                    <h3>3.7 Pemetaan “Ruang lingkup” builder ke flag inheritance</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Ruang lingkup (UI)
+                                <th>Tujuan
+                                <th>Flag yang lazim
+                        <tbody>
+                            <tr>
+                                <td>Hanya objek ini
+                                <td>ACE berlaku hanya pada target
+                                <td>(tanpa OI/CI/IO/NP)
+                            <tr>
+                                <td>Objek ini + turunan
+                                <td>Berlaku pada folder ini dan diwariskan ke bawah
+                                <td>Umumnya <span class=mono>(OI)(CI)</span>
+                            <tr>
+                                <td>Hanya turunan
+                                <td>Tidak berlaku pada folder ini, hanya diwariskan
+                                <td><span class=mono>(IO)</span> + (OI/CI) sesuai target
+                    </table>
+                    <h3>3.8 /inheritance:e|d|r — perbedaan yang sering membingungkan</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Mode
+                                <th>Arti ringkas
+                                <th>Dampak umum
+                        <tbody>
+                            <tr>
+                                <td class=mono>/inheritance:e
+                                <td>Enable inheritance
+                                <td>Objek menerima inherited ACE dari parent
+                            <tr>
+                                <td class=mono>/inheritance:d
+                                <td>Disable inheritance (tetap simpan izin yang ada)
+                                <td>Pewarisan berhenti; inherited ACE umumnya menjadi explicit pada objek ini
+                            <tr>
+                                <td class=mono>/inheritance:r
+                                <td>Remove inherited ACE
+                                <td>Menghapus entri inherited; berisiko memutus akses jika explicit ACE tidak cukup
+                    </table>
+                    <div class="callout warn"><strong>Rekomendasi</strong>
+                        <ul>
+                            <li>Gunakan <span class=inlinecode>/inheritance:r</span> hanya jika kamu paham baseline explicit ACE yang dibutuhkan.
+                            <li>Sebelum mengubah inheritance, lakukan <strong>backup ACL</strong>.
+                        </ul>
+                    </div>
+                    <h3>3.9 /grant vs /grant:r dan “deny” precedence (pemahaman praktis)</h3>
+                    <ul>
+                        <li><span class=inlinecode>/grant</span> menambahkan ACE. Jika principal sudah punya ACE lain, hasil efektif bisa jadi “bertumpuk”.
+                        <li><span class=inlinecode>/grant:r</span> mengganti ACE untuk principal target, sehingga lebih deterministik.
+                        <li><span class=inlinecode>/deny</span> perlu kehati-hatian: deny dapat mengalahkan allow dalam banyak kasus.
+                    </ul>
+                    <details>
+                        <summary>Ringkasan evaluasi (simplifikasi yang aman)</summary>
+                        <ul>
+                            <li>ACE explicit umumnya dievaluasi sebelum ACE inherited.
+                            <li>Deny biasanya diproses sebelum allow pada level yang sama.
+                            <li>Karena membership group, deny pada salah satu group dapat memengaruhi user.
+                        </ul>
+                        <p class=note>Evaluasi lengkap Windows cukup kompleks. Untuk praktik, prinsip aman: minimalkan deny, gunakan allow yang jelas,
+                            dan verifikasi dengan uji akses / icacls output sebelum dan sesudah.
+                    </details>
+                    <h3>3.10 Backup & restore ACL (best practice)</h3>
+                    <p>Gunakan pola berikut sebelum perubahan besar pada folder:
+                    <div class=codewrap><button class=copybtn type=button aria-label="Salin contoh backup restore Windows">Salin</button>
+                        <pre><code>REM Backup ACL
+icacls "C:\TargetFolder\*" /save "C:\temp\acl-backup.txt" /t
+
+REM Restore ACL (jalankan pada root yang sama)
+icacls "C:\TargetFolder" /restore "C:\temp\acl-backup.txt"</code></pre>
+                    </div>
+                    <ul class=small>
+                        <li><strong>Save</strong> biasanya memakai wildcard <span class=mono>\*</span> agar mencakup isi.
+                        <li><strong>Restore</strong> dilakukan pada root folder yang konsisten dengan struktur saat backup.
+                        <li>Untuk rollback cepat, simpan file backup bersama tiket/incident.
+                    </ul>
+                    <h3>3.11 takeown vs icacls /setowner</h3>
+                    <ul>
+                        <li><span class=inlinecode>takeown</span> berguna untuk “mengambil alih” kepemilikan saat akses terkunci.
+                        <li><span class=inlinecode>icacls /setowner</span> menetapkan owner secara eksplisit (butuh privilege yang memadai).
+                        <li>Jika tujuanmu hanya mengubah ACL, terkadang ownership bukan masalah. Namun pada kasus tertentu, ownership menjadi penghalang.
+                    </ul>
+                    <h3>3.12 attrib read-only bukan kontrol keamanan</h3>
+                    <ul>
+                        <li><span class=inlinecode>attrib +R</span> menandai file/folder sebagai read-only (atribut).
+                        <li>ACL NTFS tetap menjadi mekanisme keamanan utama. Atribut read-only tidak menggantikan deny/allow ACL.
+                    </ul>
+                    <h3>3.13 Verifikasi & audit (Windows)</h3>
+                    <ul>
+                        <li>Lihat ACL: <span class=inlinecode>icacls "C:\path"</span>
+                        <li>Cek group user (bantuan analisis efektif permission): <span class=inlinecode>whoami /groups</span>
+                        <li>Catat perubahan: simpan output command + snapshot icacls sebelum/sesudah.
+                    </ul>
+                </div>
+            </section>
+            <section class=card id=linux>
+                <div class=hd>
+                    <h2>4) Linux: chmod / chown / setfacl (materi lengkap)</h2><span class=chip>Linux</span>
+                </div>
+                <div class=bd>
+                    <h3>4.1 chmod numeric (angka) — cara menghitung</h3>
+                    <p>Setiap kategori (u/g/o) memakai bobot: <span class=inlinecode>r=4</span>, <span class=inlinecode>w=2</span>, <span class=inlinecode>x=1</span>.
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Nilai
+                                <th>Bit
+                                <th>Makna
+                        <tbody>
+                            <tr>
+                                <td class=mono>7
+                                <td class=mono>rwx
+                                <td>Read + write + execute
+                            <tr>
+                                <td class=mono>6
+                                <td class=mono>rw-
+                                <td>Read + write
+                            <tr>
+                                <td class=mono>5
+                                <td class=mono>r-x
+                                <td>Read + execute
+                            <tr>
+                                <td class=mono>4
+                                <td class=mono>r--
+                                <td>Read
+                            <tr>
+                                <td class=mono>0
+                                <td class=mono>---
+                                <td>Tanpa izin
+                    </table>
+                    <h3>4.2 chmod symbolic (huruf) — operator +, -, =</h3>
+                    <ul>
+                        <li><span class=inlinecode>u</span> owner, <span class=inlinecode>g</span> group, <span class=inlinecode>o</span> other, <span class=inlinecode>a</span> all.
+                        <li><span class=inlinecode>+</span> menambah permission, <span class=inlinecode>-</span> menghapus, <span class=inlinecode>=</span> menetapkan tepat seperti yang disebut.
+                    </ul>
+                    <div class=codewrap><button class=copybtn type=button aria-label="Salin contoh chmod symbolic">Salin</button>
+                        <pre><code># Tambah write untuk group
+chmod g+w /path/file
+
+# Set persis: owner=rw, group=r, other=
+chmod u=rw,g=r,o= /path/file
+
+# Contoh builder: gunakan X agar rekursif lebih aman
+chmod -R u=rwX,g=rX,o= /path/dir</code></pre>
+                    </div>
+                    <h3>4.3 “X” (kapital) vs “x” saat rekursif</h3>
+                    <ul>
+                        <li><span class=inlinecode>x</span>: selalu memberi execute (berisiko membuat semua file menjadi executable).
+                        <li><span class=inlinecode>X</span>: memberi execute hanya untuk folder atau file yang sebelumnya sudah executable — lebih aman untuk operasi rekursif.
+                    </ul>
+                    <h3>4.4 Preset umum: 755/644 dan alasan praktisnya</h3>
+                    <ul>
+                        <li><strong>Folder 755</strong>: owner rwx, group r-x, other r-x — bisa traverse.
+                        <li><strong>File 644</strong>: owner rw-, group r--, other r-- — read-only untuk non-owner.
+                    </ul>
+                    <details>
+                        <summary>Tambahan materi: umask (mengapa default permission sering tidak “penuh”)</summary>
+                        <p class=muted><strong>umask</strong> memotong izin default saat file/folder dibuat. Karena itu, “default” sering terlihat seperti 644/755.
+                            Ini bukan hasil chmod, melainkan hasil kebijakan penciptaan file + umask.
+                    </details>
+                    <h3>4.5 chown / chgrp</h3>
+                    <ul>
+                        <li><span class=inlinecode>chown user:group target</span> mengubah owner dan group.
+                        <li><span class=inlinecode>chgrp group target</span> mengubah group saja.
+                        <li>Operasi rekursif memakai <span class=inlinecode>-R</span> atau dibungkus <span class=inlinecode>find</span> bila perlu seleksi file/folder saja.
+                    </ul>
+                    <h3>4.6 POSIX ACL: setfacl / getfacl</h3>
+                    <p>ACL dipakai saat permission dasar tidak cukup (misalnya memberi akses spesifik kepada 1 user tanpa mengubah group).
+                    <h4>4.6.1 Struktur entri ACL</h4>
+                    <ul>
+                        <li>User tertentu: <span class=inlinecode>u:alice:rwX</span>
+                        <li>Group tertentu: <span class=inlinecode>g:staff:r-X</span>
+                        <li>Mask: <span class=inlinecode>m::rwx</span> (membatasi effective untuk entri user/group)
+                        <li>Other: <span class=inlinecode>o::r--</span>
+                    </ul>
+                    <details open>
+                        <summary>4.6.2 Mask ACL: sumber “izin sudah diset tapi tidak efektif”</summary>
+                        <p>Pada banyak sistem, <strong>mask</strong> membatasi izin efektif untuk entri user/group ACL.
+                            Jadi meskipun kamu set <span class=inlinecode>u:alice:rwx</span>, jika mask <span class=inlinecode>m::rw-</span>,
+                            izin efektif alice menjadi rw-.
+                        <div class=codewrap><button class=copybtn type=button aria-label="Salin contoh mask ACL">Salin</button>
+                            <pre><code># Lihat ACL dan "effective"
+getfacl /path/target
+
+# Set entri user + set mask agar sesuai kebutuhan
+setfacl -m u:alice:rwx,m::rwx /path/target</code></pre>
+                        </div>
+                    </details>
+                    <h4>4.6.3 Default ACL (folder) vs objek existing</h4>
+                    <ul>
+                        <li><strong>Default ACL</strong> (prefix <span class=inlinecode>d:</span>) hanya mempengaruhi objek baru yang dibuat di bawah folder.
+                        <li>Untuk objek existing, kamu perlu operasi rekursif (mis. <span class=inlinecode>setfacl -R</span> atau <span class=inlinecode>find</span>).
+                    </ul>
+                    <h3>4.7 Backup & restore ACL (Linux)</h3>
+                    <div class=codewrap><button class=copybtn type=button aria-label="Salin contoh backup restore Linux">Salin</button>
+                        <pre><code># Backup ACL rekursif
+sudo getfacl -R '/path/target' > './acl-backup.txt'
+
+# Restore ACL (membaca file backup)
+sudo setfacl --restore='./acl-backup.txt'</code></pre>
+                    </div>
+                    <h3>4.8 Verifikasi & audit (Linux)</h3>
+                    <ul>
+                        <li>Lihat permission: <span class=inlinecode>ls -l</span> dan <span class=inlinecode>stat file</span>
+                        <li>Lihat ACL: <span class=inlinecode>getfacl path</span>
+                        <li>Lihat ownership: <span class=inlinecode>ls -ld dir</span>
+                        <li>Jika hasil tidak sesuai, cek <strong>mask</strong> ACL dan apakah default ACL diterapkan pada objek existing atau tidak.
+                    </ul>
+                </div>
+            </section>
+            <section class=card id=cookbook>
+                <div class=hd>
+                    <h2>5) Cookbook: skenario umum (siap pakai + penjelasan)</h2><span class=chip>Praktik</span>
+                </div>
+                <div class=bd>
+                    <p class=muted>Bagian ini berisi resep cepat. Gunakan sebagai referensi saat membuat perintah lewat builder, lalu verifikasi hasilnya.
+                    <h3>5.1 Windows — memberi Modify untuk user pada folder + seluruh isi</h3>
+                    <div class=codewrap><button class=copybtn type=button>Salin</button>
+                        <pre><code>icacls "C:\TargetFolder" /grant "DOMAIN\User":(OI)(CI)(M) /t</code></pre>
+                    </div>
+                    <ul class=small>
+                        <li>(OI)(CI) = diwariskan ke file dan folder.
+                        <li>/t = menerapkan ke isi folder yang sudah ada.
+                    </ul>
+                    <h3>5.2 Windows — izin hanya untuk turunan (inherit-only)</h3>
+                    <div class=codewrap><button class=copybtn type=button>Salin</button>
+                        <pre><code>icacls "C:\TargetFolder" /grant "DOMAIN\User":(OI)(CI)(IO)(RX)</code></pre>
+                    </div>
+                    <h3>5.3 Windows — memutus inheritance tanpa menghapus izin yang ada</h3>
+                    <div class=codewrap><button class=copybtn type=button>Salin</button>
+                        <pre><code>icacls "C:\TargetFolder" /inheritance:d</code></pre>
+                    </div>
+                    <h3>5.4 Windows — backup ACL sebelum perubahan besar</h3>
+                    <div class=codewrap><button class=copybtn type=button>Salin</button>
+                        <pre><code>icacls "C:\TargetFolder\*" /save "C:\temp\acl-backup.txt" /t</code></pre>
+                    </div>
+                    <h3>5.5 Linux — folder 755 dan file 644 (rekursif, dipisah)</h3>
+                    <div class=codewrap><button class=copybtn type=button>Salin</button>
+                        <pre><code>sudo find '/path/target' -type d -exec sudo chmod 755 {} +
+sudo find '/path/target' -type f -exec sudo chmod 644 {} +</code></pre>
+                    </div>
+                    <h3>5.6 Linux — memberi akses spesifik ke satu user tanpa ubah group</h3>
+                    <div class=codewrap><button class=copybtn type=button>Salin</button>
+                        <pre><code>sudo setfacl -m u:alice:rwX '/path/target'</code></pre>
+                    </div>
+                    <h3>5.7 Linux — menetapkan default ACL agar item baru otomatis punya akses</h3>
+                    <div class=codewrap><button class=copybtn type=button>Salin</button>
+                        <pre><code>sudo setfacl -m d:u:alice:rwX '/path/shared'</code></pre>
+                    </div>
+                    <p class=note>Default ACL mempengaruhi item baru, bukan yang sudah ada.
+                    <h3>5.8 Linux — hapus ACL tambahan dan kembali ke mode bit</h3>
+                    <div class=codewrap><button class=copybtn type=button>Salin</button>
+                        <pre><code>sudo setfacl -b '/path/target'</code></pre>
+                    </div>
+                </div>
+            </section>
+            <section class=card id=troubleshooting>
+                <div class=hd>
+                    <h2>6) Troubleshooting: ketika hasil tidak sesuai ekspektasi</h2><span class=chip>Diagnostik</span>
+                </div>
+                <div class=bd>
+                    <h3>6.1 Windows: gejala umum</h3>
+                    <ul>
+                        <li><strong>Akses masih ditolak</strong> setelah grant:<ul>
+                                <li>Periksa apakah ada <strong>deny</strong> pada user atau salah satu group user.
+                                <li>Periksa apakah ACE yang kamu tambah hanya inherited-only (IO) sehingga tidak berlaku pada objek target.
+                                <li>Verifikasi membership: <span class=inlinecode>whoami /groups</span>
+                            </ul>
+                        <li><strong>Perubahan tidak menyentuh isi folder</strong>:<ul>
+                                <li>Pastikan <span class=inlinecode>/t</span> aktif untuk menerapkan ke item existing.
+                            </ul>
+                        <li><strong>Ingin “rollback cepat”</strong>:<ul>
+                                <li>Gunakan file backup ACL (<span class=inlinecode>/restore</span>).
+                            </ul>
+                    </ul>
+                    <div class=codewrap><button class=copybtn type=button>Salin</button>
+                        <pre><code>icacls "C:\TargetFolder"
+whoami /groups</code></pre>
+                    </div>
+                    <h3>6.2 Linux: gejala umum</h3>
+                    <ul>
+                        <li><strong>Sudah setfacl tetapi tidak efektif</strong>:<ul>
+                                <li>Cek <strong>mask</strong> ACL (<span class=inlinecode>getfacl</span> menampilkan “effective”).
+                                <li>Sesuaikan mask jika diperlukan (<span class=inlinecode>setfacl -m m::rwx ...</span>).
+                            </ul>
+                        <li><strong>Default ACL tidak mempengaruhi file lama</strong>:<ul>
+                                <li>Default ACL hanya untuk objek baru; gunakan rekursif untuk existing.
+                            </ul>
+                        <li><strong>Folder bisa list tapi tidak bisa akses file</strong>:<ul>
+                                <li>Biasanya karena <span class=inlinecode>x</span> (traverse) tidak ada pada folder.
+                            </ul>
+                    </ul>
+                    <div class=codewrap><button class=copybtn type=button>Salin</button>
+                        <pre><code>ls -ld /path/dir
+getfacl /path/dir</code></pre>
+                    </div>
+                    <div class="callout ok"><strong>Checklist aman sebelum eksekusi</strong>
+                        <ol>
+                            <li>Snapshot kondisi awal (Windows: icacls, Linux: ls -l + getfacl).
+                            <li>Backup ACL jika skala besar.
+                            <li>Pastikan scope benar (this vs children vs children-only).
+                            <li>Uji pada 1 folder kecil terlebih dahulu.
+                            <li>Catat command yang dipakai sebagai evidence.
+                        </ol>
+                    </div>
+                </div>
+            </section>
+            <p class=footerhint>Jika kamu menambah opsi baru di builder, perbarui dokumentasi ini agar pemetaan UI → command tetap konsisten.
+        </div>
+        <aside class="card toc" aria-label="Daftar isi cepat">
+            <div class=hd>
+                <h2>Daftar isi</h2><span class=chip>Navigasi</span>
+            </div>
+            <div class=bd><a href=#ringkasan>Ringkasan & peringatan</a>
+                <a href=#konsep>1) Konsep dasar</a>
+                <a class=sub href=#konsep>• Permission vs ACL</a>
+                <a class=sub href=#konsep>• r/w/x file vs folder</a>
+                <a class=sub href=#konsep>• Inheritance</a>
+                <a href=#panduan-ui>2) Panduan UI</a>
+                <a class=sub href=#panduan-ui>• Rekursif & find</a>
+                <a class=sub href=#panduan-ui>• Mode & output</a>
+                <a href=#windows>3) Windows lengkap</a>
+                <a class=sub href=#windows>• OI/CI/IO/NP</a>
+                <a class=sub href=#windows>• /inheritance e|d|r</a>
+                <a class=sub href=#windows>• grant vs grant:r</a>
+                <a class=sub href=#windows>• backup/restore</a>
+                <a href=#linux>4) Linux lengkap</a>
+                <a class=sub href=#linux>• numeric vs symbolic</a>
+                <a class=sub href=#linux>• umask</a>
+                <a class=sub href=#linux>• ACL mask & default ACL</a>
+                <a href=#cookbook>5) Cookbook</a>
+                <a href=#troubleshooting>6) Troubleshooting</a>
+            </div>
+        </aside>
+    </div>
+</div>
+<script src=./script.js defer></script>
